@@ -4,10 +4,12 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
 from langchain.chains import RetrievalQA
+from dotenv import load_dotenv
 
 def pdf_analysis_query(paths, model, prompt): 
     #model is to set what gpt model you want to use 
     #paths is an array of paths to documents
+    load_dotenv()
     loaders = []
     for path in paths:
         load = PyPDFLoader(path)
@@ -60,3 +62,9 @@ def pdf_analysis_query(paths, model, prompt):
 
     result = qa_chain({"query": prompt})
     return result
+
+path = []
+path.append('CHANGE TO YOUR DOC PATH')
+model = 'gpt-4o'
+prompt = "INPUT YOUR PROMPT"
+print(pdf_analysis_query(path, model,prompt))
