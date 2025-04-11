@@ -1,63 +1,103 @@
 # AIDS_PROJECT2
-# Project Setup Guide
 
-Welcome! This guide will help you set up your environment to run this project smoothly.
+🚀 **AIDS_PROJECT2** is a data-driven analysis project focused on AIDS-related datasets, combining data persistence, web scraping (Reddit), and AI-powered summarization for insights.
 
-## 1. Create and Activate Virtual Environment
+## 📂 Project Structure
 
-First, create a Python virtual environment to manage dependencies.
-
-### For macOS / Linux:
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
+```
+AIDS_PROJECT2/
+├── data/              # Data sources and outputs
+├── others/
+│   ├── persist/       # Persistent data storage (excluded from Git)
+│   └── other files    # Additional resources
+├── scripts/           # Project Python scripts
+│   ├── reddit_scraper.py
+│   └── summarize.py
+├── requirements.txt   # Project dependencies
+├── .gitignore         # Ignored files and folders
+└── README.md          # Project overview
 ```
 
-### For Windows:
+## ✨ Features
+
+- 🔍 **Reddit Scraper**  
+  Collects relevant Reddit posts using keyword-based search via PRAW.
+- 🧠 **AI Summarization**  
+  Uses GPT to analyze and summarize Reddit posts for quick insights.
+- 🗄️ **Data Persistence**  
+  Persistent storage structure to save and manage scraped data.
+- 🌿 **Modular Scripts**  
+  Clean and reusable Python scripts for scraping, summarizing, and analysis.
+
+## 🛠️ Installation
+
+1. **Clone the repository:**
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
+git clone https://github.com/ammond1/AIDS_PROJECT2.git
+cd AIDS_PROJECT2
 ```
 
-> **Tip:** Make sure Python is installed:
-> ```bash
-> python --version
-> ```
+2. **Create a virtual environment (optional but recommended):**
+```bash
+python -m venv venv
+source venv/bin/activate  # For Mac/Linux
+venv\Scripts\activate     # For Windows
+```
 
-## 2. Install Project Dependencies
-
-After activating your virtual environment, install the required packages:
-
+3. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-## 3. Set Up Environment Variables
-
-Create a `.env` file in the root of your project directory. Add your OpenAI API key:
-
+4. **Set up environment variables:**
+Create a `.env` file in the project root and add your API keys:
 ```
-OPENAI_API_KEY=your-api-key-here
+REDDIT_ID=your_reddit_client_id
+REDDIT_SECRET=your_reddit_client_secret
+OPENAI_API_KEY=your_openai_api_key
 ```
 
-Replace `your-api-key-here` with your actual OpenAI API key.
+## 🚀 Usage
 
-> **Important:** Never share your API keys publicly!
+Run the Reddit scraper and summarizer:
+```bash
+python scripts/reddit_scraper.py
+```
 
-## 4. You're Ready!
+The script will:
+- Search Reddit posts with your query.
+- Summarize posts using OpenAI.
+- Print summaries and optionally save data for further analysis.
 
-Now you can run your Python scripts, and they will automatically use the installed dependencies and environment variables from your `.env` file.
+## 📦 Requirements
 
-## Optional Tips
+- Python 3.x
+- PRAW
+- OpenAI Python SDK
+- python-dotenv
 
-- To update `requirements.txt` after adding new packages:
-  ```bash
-  pip freeze > requirements.txt
-  ```
+(See `requirements.txt` for full list.)
 
-- To deactivate the virtual environment:
-  ```bash
-  deactivate
-  ```
+## 🤖 Future Improvements
 
-Happy coding! 🚀
+- [ ] Add sentiment analysis of Reddit posts
+- [ ] Visualize summarized data
+- [ ] Automate regular scraping & reporting
+- [ ] Add CSV/JSON export of summaries
+
+## 🧩 Contributing
+
+Contributions are welcome!  
+Feel free to open issues or submit pull requests.
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## 🙌 Acknowledgements
+
+- [PRAW](https://praw.readthedocs.io/) — Python Reddit API Wrapper
+- [OpenAI](https://platform.openai.com/docs) — GPT API
+- [Python-dotenv](https://github.com/theskumar/python-dotenv) — Environment variable management
+
+> *Data is scraped for educational and research purposes only. Please respect Reddit's API usage policies.*
