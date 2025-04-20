@@ -2,155 +2,237 @@ import shutil
 import os
 from langchain.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
-from langchain_openai import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
 from langchain.vectorstores import Chroma
 from googleapiclient.discovery import build
 import praw
-from openai import OpenAI
-import re
 from collections import Counter
 import requests
-from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_search import YoutubeSearch
-from textblob import TextBlob
-from fuzzywuzzy import fuzz
 import ast
+from fuzzywuzzy import fuzz
+from openai import OpenAI
+import firebase_admin
+from firebase_admin import credentials, db
 
-#load .env file
+# Initialize Firebase
+cred = credentials.Certificate("/Users/admin/Desktop/AIDS 2/aids-project-2-25dcd-firebase-adminsdk-fbsvc-6788c98952.json")
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://aids-project-2-25dcd-default-rtdb.asia-southeast1.firebasedatabase.app'
+})
+
+# Load environment variables
 load_dotenv()
 
-#instantiate openai object
+# Instantiate OpenAI client
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-#not being used at the moment
-def pdf_analysis_query(paths, model, prompt): 
-    #model is to set what gpt model you want to use 
-    #paths is an array of paths to documents
-
-    loaders = []
-    for path in paths:
-        load = PyPDFLoader(path)
-        loaders.append(load)
-
-    document = []
+# --- PDF Analysis (currently not called in main flow) ---
+def pdf_analysis_query(paths, model, prompt):
+    loaders = [PyPDFLoader(path) for path in paths]
+    documents = []
     for loader in loaders:
-        document.extend(loader.load())
+        documents.extend(loader.load())
+    
+    print(f"{len(loaders)} documents loaded with {len(documents)} pages.")
 
-    print(len(loaders), "documents loaded with", len(document), "pages in total.")
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=300)
+    splits = text_splitter.split_documents(documents)
 
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1500,
-        chunk_overlap=300
-    )
-    splits = text_splitter.split_documents(document)
+    print("Number of splits:", len(splits))
 
-    print("Number of splits in document loaded:", len(splits))
+    embedding = OpenAIEmbeddings()
 
-    embedding = OpenAIEmbeddings() #creates embedding model
-
-    #check if a persist directory exists if yes delete to start a fresh one 
+    # Reset persistence directory
     try:
-        shutil.rmtree('others/persist')       # remove old version, else can't work
-        print("Deleting previous store")
+        shutil.rmtree('others/persist')
+        print("Deleted previous store.")
     except:
-        print("No store found")
+        print("No previous store found.")
 
     persist_directory = './others/persist'
 
-
     vectordb = Chroma.from_documents(
-        documents=splits,                           # target the splits created from the documents loaded
-        embedding=embedding,                        # use the OpenAI embedding specified
-        persist_directory=persist_directory         # store in the persist directory for future use
+        documents=splits,
+        embedding=embedding,
+        persist_directory=persist_directory
     )
+    vectordb.persist()
 
-    vectordb.persist()                              # store vectordb
+    print(f"Persist directory created. Size of Vector DB: {vectordb._collection.count()}")
 
-    print("Persist Directory created.")
-    print("Size of Vector Database:", vectordb._collection.count())    # same as the number of splits
-
-    llm = llm = ChatOpenAI(model_name=model, temperature=0)
+    llm = ChatOpenAI(model_name=model, temperature=0)
     qa_chain = RetrievalQA.from_chain_type(
-    llm,
-    # retriever=vectordb.as_retriever(search_type="mmr", search_kwargs={"k": 4, "fetch_k": 6}),
-    retriever=vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 4}),
-    return_source_documents=True
+        llm,
+        retriever=vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 4}),
+        return_source_documents=True
     )
 
     result = qa_chain({"query": prompt})
     return result
 
+# --- Reddit Scraper ---
 
-#reddit scrapper
-def reddit_scrap_with_negatives(product_name, negative_keywords, number_of_posts=10000):
 
-    # Set up Reddit API
+
+def reddit_scrap_with_negatives(product_name, negative_keywords, number_of_posts=10, nickname_variants=None):
+    """Scrape Reddit posts and comments for negative mentions of a product."""
+    print (nickname_variants)
+    # Initialize Reddit API
     reddit = praw.Reddit(
         client_id=os.getenv('REDDIT_ID'),
         client_secret=os.getenv('REDDIT_SECRET'),
-        user_agent='Reddit scraper'
+        user_agent='ProductSentimentScraperV2'
     )
 
-    # Search Reddit
-    subreddit = reddit.subreddit('all')
-    posts = []
+    # Prepare search variants
+    nickname_variants = nickname_variants or []
+    search_variants = [product_name.lower()] + [v.lower() for v in nickname_variants]
 
-    for submission in subreddit.search(product_name, limit=number_of_posts):
-        posts.append(submission.title + " " + (submission.selftext or ""))
-    print( posts)
-    # Analyze posts
+    # Find target subreddits
+    suggested_subreddits = dynamic_subreddit_search(product_name)
+    target_subreddits = list(set(suggested_subreddits + [
+        'technology', 'gadgets', 'reviews', 'pcgaming', 'buildapc'
+    ]))
+
+    print(f"\n🎯 Target subreddits: {target_subreddits}\n")
+
     keyword_counter = Counter()
 
-    for post in posts:
-        post_lower = post.lower()
-        for keyword in negative_keywords:
-            # Use word boundaries to match full words
-            if re.search(re.escape(keyword), post_lower):
-                keyword_counter[keyword] += 1
+    # Search each subreddit
+    for subreddit_name in target_subreddits:
+        print(f"🔎 Searching subreddit: r/{subreddit_name}")
+        subreddit = reddit.subreddit(subreddit_name)
 
-    # Display results
-    print(f"Product: {product_name}\n")
-    print("Negative keyword mentions:")
-    for keyword in negative_keywords:
-        print(f"- {keyword}: {keyword_counter[keyword]} mentions")
+        #search each variant
+        for variant in search_variants:
+            variant = str(variant)  # Ensure variant is a string
+            print(f"🔍 Search term: {variant}")
 
-def search_youtube(product_name, max_results=5):
-    """Search YouTube for review videos."""
+            try:
+                # Reddit search
+                for submission in subreddit.search(variant, sort='new', limit = number_of_posts):
+                    content = f"{submission.title or ''} {submission.selftext or ''}".lower()
+
+                    # Check post content
+                    for keyword in negative_keywords:
+                        if keyword.lower() in content:
+                            keyword_counter[keyword.lower()] += 1
+
+                    # Check comments
+                    try:
+                        submission.comments.replace_more(limit=None)
+                        for comment in submission.comments.list():
+                            comment_body = comment.body.lower()
+                            for keyword in negative_keywords:
+                                if keyword.lower() in comment_body:
+                                    keyword_counter[keyword.lower()] += 1
+                    except Exception as e:
+                        print(f"⚠️ Error loading comments: {e}")
+
+            except Exception as e:
+                print(f"⚠️ Error searching subreddit '{subreddit_name}' with variant '{variant}': {e}")
+
+    # Final Results
+    print(f"\n📊 Final Results for: {product_name}")
+    print("-" * 40)
+    for keyword, count in keyword_counter.items():
+        print(f"{keyword}: {count} mentions")
+
+    return keyword_counter
+
+
+def dynamic_subreddit_search(query):
+    """Find subreddits related to the product."""
+    url = f"https://www.reddit.com/subreddits/search.json?q={query}&limit=10"
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    try:
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        subreddits = []
+        for child in data['data']['children']:
+            subreddits.append(child['data']['display_name'])
+        return subreddits
+    except Exception as e:
+        print(f"Dynamic subreddit search failed: {e}")
+        return []
+    
+def generate_nicknames(product_name):
+    prompt = f"""
+    Give me a list of 8-12 common nickname variants or short forms that people online might use to refer to "{product_name}". 
+    Include abbreviations, model names, brand shorthands, etc.
+    Respond only as a valid Python list of strings.
+    """
+    
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    nicknames = eval(response.choices[0].message.content)
+    return nicknames
+
+# --- YouTube Search ---
+def search_youtube(product_name, max_results=10):
     results = YoutubeSearch(f"{product_name} review", max_results=max_results).to_dict()
     return results
 
-def get_video_comments(video_id, api_key, max_comments=20):
-    """Get comments from a YouTube video using YouTube Data API."""
+# --- Fetch all YouTube comments (with nested replies) ---
+def get_all_video_comments(video_id, api_key, max_comments=500):
     comments = []
-    url = f"https://www.googleapis.com/youtube/v3/commentThreads?key={api_key}&textFormat=plainText&part=snippet&videoId={video_id}&maxResults={max_comments}"
-    
+    url = f"https://www.googleapis.com/youtube/v3/commentThreads?key={api_key}&textFormat=plainText&part=snippet,replies&videoId={video_id}&maxResults=100"
+
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
         for item in data.get('items', []):
+            # Top-level comment
             comment = item['snippet']['topLevelComment']['snippet']['textDisplay']
             comments.append(comment)
+            # Replies to the comment
+            if 'replies' in item:
+                for reply in item['replies']['comments']:
+                    comments.append(reply['snippet']['textDisplay'])
     else:
         print(f"Failed to fetch comments for {video_id}")
     
-    return comments
+    return comments[:max_comments]
 
-def analyze_sentiment(text):
-    """Simple sentiment analyzer: returns polarity."""
-    blob = TextBlob(text)
-    return blob.sentiment.polarity  # -1 (very negative) to +1 (very positive)
+# --- Sentiment Analysis ---
+NEGATIVE_WORDS = [
+    "bad", "terrible", "horrible", "worst", "hate", "broken", "disappointed",
+    "disappointing", "sucks", "awful", "problem", "issues", "trash", "scam", "ripoff", "annoying"
+]
 
+def fast_sentiment(text):
+    text_lower = text.lower()
+    negative_hits = sum(1 for word in NEGATIVE_WORDS if word in text_lower)
+    return "negative" if negative_hits > 0 else "neutral"
+
+def hybrid_sentiment(text, openai_client):
+    fast_result = fast_sentiment(text)
+    if fast_result == "negative":
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a sentiment analysis expert."},
+                {"role": "user", "content": f"Is the following comment expressing negativity towards a product? Reply only 'Yes' or 'No'.\n\nComment: {text}"}
+            ]
+        )
+        reply = response.choices[0].message.content.strip().lower()
+        return "negative" if "yes" in reply else "neutral"
+    else:
+        return "neutral"
+
+# --- Comment Simplification ---
 def simplify_comment(text):
-    """Simplify a comment: lower, remove fluff, trim."""
     return text.lower().strip()
 
-def group_similar_issues(issues, similarity_threshold=80):
-    """Group very similar issues together based on fuzzy text matching."""
+# --- Group similar issues ---
+def group_similar_issues(issues, similarity_threshold=70):
     grouped = []
-
     for issue in issues:
         found_similar = False
         for existing in grouped:
@@ -161,45 +243,21 @@ def group_similar_issues(issues, similarity_threshold=80):
             grouped.append(issue)
     return grouped
 
-def analyze_transcript(video_id):
-    """Analyze the transcript to extract specific negative parts."""
+# --- Analyze video (upgraded) ---
+def analyze_video(video_id, api_key, openai_client):
     negatives = []
+    comments = get_all_video_comments(video_id, api_key)
 
-    try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
-        for entry in transcript:
-            text = entry['text']
-            if analyze_sentiment(text) < -0.1:
-                negatives.append(text)
-    except Exception as e:
-        print(f"No transcript available for {video_id} ({e})")
-    
-    return negatives
-
-def analyze_video(video_id, api_key):
-    """Analyze transcript + comments for negativity."""
-    negatives = []
-
-    # # Analyze transcript
-    # transcript_negatives = analyze_transcript(video_id)
-    # for t in transcript_negatives:
-    #     simplified = simplify_comment(t)
-    #     if simplified:
-    #         negatives.append(simplified)
-
-    # Analyze comments
-    comments = get_video_comments(video_id, api_key)
     for comment in comments:
-        if analyze_sentiment(comment) < -0.1:
+        if hybrid_sentiment(comment, openai_client) == "negative":
             simplified = simplify_comment(comment)
             if simplified:
                 negatives.append(simplified)
 
-    # ✨ Group very similar complaints
     final_negatives = group_similar_issues(negatives)
-
     return final_negatives
 
+# --- Clean and extract final keywords ---
 def comment_clean(negatives, product_name):
     response = client.chat.completions.create(
         model="gpt-4",
@@ -218,24 +276,47 @@ IMPORTANT: Only respond with a **valid Python array** (e.g., ['keyword1', 'keywo
     )
     return ast.literal_eval(response.choices[0].message.content)
 
-def main():
-    # Replace this with your YouTube API key
+def handle_new_product(event):
+    data = event.data
+    if data:
+        product_name = data.get('productName')
+        if product_name:
+            print(f"New product submitted: {product_name}")
+            
+            # Step 2: scrape Reddit
+            results = main(product_name)
+            
+            # Step 3: push results back to Firebase
+            result_ref = db.reference(f'results/{event.path.split("/")[-1]}')  # use same key
+            result_ref.set(results)
+            print(f"Sent results back to Firebase.")
+
+# Attach listener
+products_ref = db.reference('products')
+products_ref.listen(handle_new_product)
+
+# --- MAIN ---
+def main(product_name):
     YOUTUBE_API_KEY = os.getenv('GOOGLE_KEY')
 
-    product_name = input("Enter product name: ")
     videos = search_youtube(product_name)
     negatives = []
+
     for video in videos:
         title = video['title']
         video_id = video['id']
         print(f"\nAnalyzing video: {title}")
 
-        negatives += analyze_video(video_id, YOUTUBE_API_KEY)
-        
-    print(' look here',negatives)
-    negatives = comment_clean(negatives, product_name)
-    print(negatives)
-    reddit_scrap_with_negatives(product_name, negatives)
+        negatives += analyze_video(video_id, YOUTUBE_API_KEY, client)
 
-if __name__ == "__main__":
-    main()
+    print('Raw negatives collected:', negatives)
+
+    print('cleaning comments')
+    negatives = comment_clean(negatives, product_name)
+    print('Cleaned keywords:', negatives)
+    
+    print('scraping reddit')
+    return reddit_scrap_with_negatives(product_name, negatives, nickname_variants=generate_nicknames(product_name))
+
+# if __name__ == "__main__":
+#     main()

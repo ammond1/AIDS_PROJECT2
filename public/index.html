@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Product Sentiment Analyzer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #74ebd5, #ACB6E5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      margin: 1rem 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    #chart-container {
+      margin-top: 2rem;
+      width: 100%;
+    }
+
+    canvas {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>🔍 Analyze Product Sentiment</h1>
+
+    <input type="text" id="productInput" placeholder="Enter a product name...">
+    <button onclick="submitProduct()">Submit</button>
+
+    <div id="chart-container" style="display:none;">
+      <canvas id="resultChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    // Your Firebase configuration
+  const firebaseConfig = {
+  apiKey: "AIzaSyA7QvewqGJHiFWobWrviFEv23RUNis6MY8",
+  authDomain: "aids-project-2-25dcd.firebaseapp.com",
+  databaseURL: "https://aids-project-2-25dcd-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "aids-project-2-25dcd",
+  storageBucket: "aids-project-2-25dcd.firebasestorage.app",
+  messagingSenderId: "99933426831",
+  appId: "1:99933426831:web:ba203f45c4972610d7ccfa",
+  measurementId: "G-PT5NY3FSJV"
+};
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+  function submitProduct() {
+    const productName = document.getElementById('productInput').value.trim();
+    if (!productName) {
+      alert('Please enter a product name!');
+      return;
+    }
+
+    const newRef = database.ref('products').push();
+    newRef.set({
+      productName: productName,
+      timestamp: Date.now()
+    });
+
+    alert('✅ Product submitted for analysis! It might take a few seconds...');
+
+    // Listen for the backend results
+    newRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data && data.results) {
+        showGraph(data.results);
+      }
+    });
+  }
+
+    function showGraph(results) {
+      document.getElementById('chart-container').style.display = 'block';
+
+      const ctx = document.getElementById('resultChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(results),
+          datasets: [{
+            label: '# of Negative Mentions',
+            data: Object.values(results),
+            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>
