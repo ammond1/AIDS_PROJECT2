@@ -14,17 +14,17 @@ from youtube_search import YoutubeSearch
 import ast
 from fuzzywuzzy import fuzz
 from openai import OpenAI
-import firebase_admin
+import json
 from firebase_admin import credentials, db
-
+load_dotenv()
 # Initialize Firebase
-cred = credentials.Certificate("/Users/admin/Desktop/AIDS 2/aids-project-2-25dcd-firebase-adminsdk-fbsvc-6788c98952.json")
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://aids-project-2-25dcd-default-rtdb.asia-southeast1.firebasedatabase.app'
-})
+
+
+firebase_creds = json.loads(os.getenv("FIREBASE_SERVICE_ACCOUNT"))
+cred = credentials.Certificate(firebase_creds)
 
 # Load environment variables
-load_dotenv()
+
 
 # Instantiate OpenAI client
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
