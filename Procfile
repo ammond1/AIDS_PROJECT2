@@ -1,1 +1,1 @@
-worker: python your_backend_filename.py
+worker: python main.py
