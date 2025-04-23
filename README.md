@@ -1,103 +1,155 @@
+
 # AIDS_PROJECT2
 
-🚀 **AIDS_PROJECT2** is a data-driven analysis project focused on AIDS-related datasets, combining data persistence, web scraping (Reddit), and AI-powered summarization for insights.
+AIDS_PROJECT2 scrapes Reddit posts related to AIDS, summarizes them using OpenAI's GPT API, stores the summaries in Firebase Realtime Database, and provides a web interface hosted on Firebase to view the results.
 
-## 📂 Project Structure
+---
 
-```
-AIDS_PROJECT2/
-├── data/              # Data sources and outputs
-├── others/
-│   ├── persist/       # Persistent data storage (excluded from Git)
-│   └── other files    # Additional resources
-├── scripts/           # Project Python scripts
-│   ├── reddit_scraper.py
-│   └── summarize.py
-├── requirements.txt   # Project dependencies
-├── .gitignore         # Ignored files and folders
-└── README.md          # Project overview
-```
+## 📦 Installation
 
-## ✨ Features
+1. Clone the repository:
 
-- 🔍 **Reddit Scraper**  
-  Collects relevant Reddit posts using keyword-based search via PRAW.
-- 🧠 **AI Summarization**  
-  Uses GPT to analyze and summarize Reddit posts for quick insights.
-- 🗄️ **Data Persistence**  
-  Persistent storage structure to save and manage scraped data.
-- 🌿 **Modular Scripts**  
-  Clean and reusable Python scripts for scraping, summarizing, and analysis.
+   ```bash
+   git clone https://github.com/ammond1/AIDS_PROJECT2.git
+   cd AIDS_PROJECT2
+   ```
 
-## 🛠️ Installation
+2. Set up a Python virtual environment:
 
-1. **Clone the repository:**
-```bash
-git clone https://github.com/ammond1/AIDS_PROJECT2.git
-cd AIDS_PROJECT2
-```
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # macOS/Linux
+   venv\Scripts\activate     # Windows
+   ```
 
-2. **Create a virtual environment (optional but recommended):**
-```bash
-python -m venv venv
-source venv/bin/activate  # For Mac/Linux
-venv\Scripts\activate     # For Windows
-```
+3. Install Python dependencies:
 
-3. **Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-4. **Set up environment variables:**
-Create a `.env` file in the project root and add your API keys:
+---
+
+## ⚙️ Environment Variables
+
+Create a `.env` file in the root directory with the following contents:
+
 ```
 REDDIT_ID=your_reddit_client_id
 REDDIT_SECRET=your_reddit_client_secret
 OPENAI_API_KEY=your_openai_api_key
+FIREBASE_DB_URL=your_firebase_realtime_database_url
+FIREBASE_CREDENTIALS_PATH=path_to_your_firebase_service_account.json
 ```
 
-## 🚀 Usage
+You need a Firebase Realtime Database set up and a service account JSON credentials file.
 
-Run the Reddit scraper and summarizer:
+---
+
+## 🖥️ Setting up Firebase Hosting and Realtime Database
+
+1. Install Firebase CLI:
+
+   ```bash
+   npm install -g firebase-tools
+   ```
+
+2. Login to Firebase:
+
+   ```bash
+   firebase login
+   ```
+
+3. Initialize Firebase in the project directory:
+
+   ```bash
+   firebase init
+   ```
+
+   - Select **Hosting** and **Database**.
+   - Set `public/` as your hosting directory.
+   - Configure as a single-page app if needed (yes).
+   - Set up your Firebase Realtime Database rules and URL.
+
+4. Set up `public/` frontend to read data from your Realtime Database (make sure your `index.html` includes Firebase SDK and database references).
+
+Example snippet in your `index.html`:
+
+```html
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "YOUR_DATABASE_URL",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  db.ref('summaries/').on('value', (snapshot) => {
+    const data = snapshot.val();
+    // Display data on your page
+  });
+</script>
+```
+
+---
+
+## 🧠 Running the Backend
+
+Run the Python script to scrape and summarize Reddit posts and upload them to Firebase:
+
 ```bash
-python scripts/reddit_scraper.py
+python main.py
 ```
 
-The script will:
-- Search Reddit posts with your query.
-- Summarize posts using OpenAI.
-- Print summaries and optionally save data for further analysis.
+This script will:
+- Connect to Reddit
+- Fetch posts based on keywords
+- Summarize the posts using OpenAI
+- Upload the results to your Firebase Realtime Database under `summaries/`
 
-## 📦 Requirements
+Make sure your service account JSON and database URL are correctly referenced.
 
-- Python 3.x
+---
+
+## 🌐 Hosting the Frontend
+
+Deploy the frontend to Firebase Hosting:
+
+```bash
+firebase deploy
+```
+
+After deploying, you can access the app at the provided Firebase Hosting URL.
+
+---
+
+## ✅ Requirements
+
+- Python 3.8+
 - PRAW
-- OpenAI Python SDK
+- OpenAI SDK
+- Flask (optional for local development)
 - python-dotenv
+- firebase-admin (Python SDK)
+- Firebase CLI
 
-(See `requirements.txt` for full list.)
+Install Firebase Admin SDK:
 
-## 🤖 Future Improvements
+```bash
+pip install firebase-admin
+```
 
-- [ ] Add sentiment analysis of Reddit posts
-- [ ] Visualize summarized data
-- [ ] Automate regular scraping & reporting
-- [ ] Add CSV/JSON export of summaries
+---
 
-## 🧩 Contributing
+## 📌 Notes
 
-Contributions are welcome!  
-Feel free to open issues or submit pull requests.
-
-## 📄 License
-
-This project is open source and available under the [MIT License](LICENSE).
-
-## 🙌 Acknowledgements
-
-- [PRAW](https://praw.readthedocs.io/) — Python Reddit API Wrapper
-- [OpenAI](https://platform.openai.com/docs) — GPT API
-- [Python-dotenv](https://github.com/theskumar/python-dotenv) — Environment variable management
-
-> *Data is scraped for educational and research purposes only. Please respect Reddit's API usage policies.*
+- Firebase hosting and realtime database configuration files are included.
+- Use responsibly and comply with Reddit’s, OpenAI’s, and Firebase's usage policies.
