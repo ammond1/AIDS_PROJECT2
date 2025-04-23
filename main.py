@@ -15,14 +15,16 @@ import ast
 from fuzzywuzzy import fuzz
 from openai import OpenAI
 import json
+import firebase_admin
 from firebase_admin import credentials, db
 load_dotenv()
 # Initialize Firebase
 
 
-firebase_creds = json.loads(os.getenv("FIREBASE_SERVICE_ACCOUNT"))
-cred = credentials.Certificate(firebase_creds)
-
+cred = credentials.Certificate("/Users/admin/Desktop/AIDS 2/aids-project-2-25dcd-firebase-adminsdk-fbsvc-6788c98952.json")
+firebase_admin.initialize_app(cred, {
+     'databaseURL': 'https://aids-project-2-25dcd-default-rtdb.asia-southeast1.firebasedatabase.app'
+ })
 # Load environment variables
 
 
