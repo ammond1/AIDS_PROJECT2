@@ -278,27 +278,27 @@ IMPORTANT: Only respond with a **valid Python array** (e.g., ['keyword1', 'keywo
     )
     return ast.literal_eval(response.choices[0].message.content)
 
-def handle_new_product(event):
-    data = event.data
-    if data:
-        product_name = data.get('productName')
-        if product_name:
-            print(f"New product submitted: {product_name}")
+# def handle_new_product(event):
+#     data = event.data
+#     if data:
+#         product_name = data.get('productName')
+#         if product_name:
+#             print(f"New product submitted: {product_name}")
             
-            # Step 2: scrape Reddit
-            results = main(product_name)
+#             # Step 2: scrape Reddit
+#             results = main(product_name)
             
-            # Step 3: push results back to Firebase
-            result_ref = db.reference(f'results/{event.path.split("/")[-1]}')  # use same key
-            result_ref.set(results)
-            print(f"Sent results back to Firebase.")
+#             # Step 3: push results back to Firebase
+#             result_ref = db.reference(f'results/{event.path.split("/")[-1]}')  # use same key
+#             result_ref.set(results)
+#             print(f"Sent results back to Firebase.")
 
-# Attach listener
-products_ref = db.reference('products')
-products_ref.listen(handle_new_product)
+# # Attach listener
+# products_ref = db.reference('products')
+# products_ref.listen(handle_new_product)
 
 # --- MAIN ---
-def main(product_name):
+def main():
     YOUTUBE_API_KEY = os.getenv('GOOGLE_KEY')
 
     videos = search_youtube(product_name)
