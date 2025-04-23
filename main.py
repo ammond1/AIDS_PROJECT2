@@ -320,5 +320,5 @@ def main(product_name):
     print('scraping reddit')
     return reddit_scrap_with_negatives(product_name, negatives, nickname_variants=generate_nicknames(product_name))
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
