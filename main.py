@@ -14,7 +14,6 @@ from youtube_search import YoutubeSearch
 import ast
 from fuzzywuzzy import fuzz
 from openai import OpenAI
-import json
 import firebase_admin
 from firebase_admin import credentials, db
 load_dotenv()
@@ -79,9 +78,9 @@ def pdf_analysis_query(paths, model, prompt):
 
 
 
-def reddit_scrap_with_negatives(product_name, negative_keywords, number_of_posts=10, nickname_variants=None):
+def reddit_scrap_with_negatives(product_name, negative_keywords, number_of_posts=100, nickname_variants=None):
     """Scrape Reddit posts and comments for negative mentions of a product."""
-    print (nickname_variants)
+    # print (nickname_variants)
     # Initialize Reddit API
     reddit = praw.Reddit(
         client_id=os.getenv('REDDIT_ID'),
@@ -94,14 +93,11 @@ def reddit_scrap_with_negatives(product_name, negative_keywords, number_of_posts
     search_variants = [product_name.lower()] + [v.lower() for v in nickname_variants]
 
     # Find target subreddits
-    suggested_subreddits = dynamic_subreddit_search(product_name)
-    target_subreddits = list(set(suggested_subreddits + [
-        'technology', 'gadgets', 'reviews', 'pcgaming', 'buildapc'
-    ]))
+    target_subreddits = dynamic_subreddit_search(product_name)
 
     print(f"\n🎯 Target subreddits: {target_subreddits}\n")
 
-    keyword_counter = Counter()
+    keyword_counter = {}
 
     # Search each subreddit
     for subreddit_name in target_subreddits:
@@ -121,7 +117,12 @@ def reddit_scrap_with_negatives(product_name, negative_keywords, number_of_posts
                     # Check post content
                     for keyword in negative_keywords:
                         if keyword.lower() in content:
-                            keyword_counter[keyword.lower()] += 1
+                            if keyword.lower() not in keyword_counter:
+                                keyword_counter[keyword.lower()] = 0
+                                keyword_counter[keyword.lower()] +=1
+                            if keyword.lower() in content:
+                                keyword_counter[keyword.lower()] += 1
+
 
                     # Check comments
                     try:
@@ -130,7 +131,11 @@ def reddit_scrap_with_negatives(product_name, negative_keywords, number_of_posts
                             comment_body = comment.body.lower()
                             for keyword in negative_keywords:
                                 if keyword.lower() in comment_body:
-                                    keyword_counter[keyword.lower()] += 1
+                                    if keyword.lower() not in keyword_counter:
+                                        keyword_counter[keyword.lower()] = 0
+                                        keyword_counter[keyword.lower()] +=1
+                                    if keyword.lower() in content:
+                                        keyword_counter[keyword.lower()] += 1
                     except Exception as e:
                         print(f"⚠️ Error loading comments: {e}")
 
@@ -148,7 +153,7 @@ def reddit_scrap_with_negatives(product_name, negative_keywords, number_of_posts
 
 def dynamic_subreddit_search(query):
     """Find subreddits related to the product."""
-    url = f"https://www.reddit.com/subreddits/search.json?q={query}&limit=10"
+    url = f"https://www.reddit.com/subreddits/search.json?q={query}&limit=8"
     headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
@@ -164,7 +169,7 @@ def dynamic_subreddit_search(query):
     
 def generate_nicknames(product_name):
     prompt = f"""
-    Give me a list of 8-12 common nickname variants or short forms that people online might use to refer to "{product_name}". 
+    Give me a list of 5 common nickname variants or short forms that people online might use to refer to "{product_name}". 
     Include abbreviations, model names, brand shorthands, etc.
     Respond only as a valid Python list of strings.
     """
@@ -203,9 +208,12 @@ def get_all_video_comments(video_id, api_key, max_comments=500):
     return comments[:max_comments]
 
 # --- Sentiment Analysis ---
-NEGATIVE_WORDS = [
+NEGATIVE_PATTERNS = [
     "bad", "terrible", "horrible", "worst", "hate", "broken", "disappointed",
-    "disappointing", "sucks", "awful", "problem", "issues", "trash", "scam", "ripoff", "annoying"
+    "disappointing", "sucks", "awful", "problem", "issues", "trash", "scam", "ripoff", "annoying",
+    "poor", "frustrating", "not good", "didn't work", "doesn't work", "hard to use",
+    "waste of money", "misleading", "useless", "defective", "regret", "cheap quality",
+    "returning it", "gave up", "not worth it"
 ]
 
 def fast_sentiment(text):
@@ -217,7 +225,7 @@ def hybrid_sentiment(text, openai_client):
     fast_result = fast_sentiment(text)
     if fast_result == "negative":
         response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a sentiment analysis expert."},
                 {"role": "user", "content": f"Is the following comment expressing negativity towards a product? Reply only 'Yes' or 'No'.\n\nComment: {text}"}
@@ -278,29 +286,33 @@ IMPORTANT: Only respond with a **valid Python array** (e.g., ['keyword1', 'keywo
     )
     return ast.literal_eval(response.choices[0].message.content)
 
-# def handle_new_product(event):
-#     data = event.data
-#     if data:
-#         product_name = data.get('productName')
-#         if product_name:
-#             print(f"New product submitted: {product_name}")
+def handle_new_product(event):
+    data = event.data
+    print(event.path)
+    if data:
+        product_name = data.get('productName')
+        if product_name:
+            print(f"New product submitted: {product_name}")
             
-#             # Step 2: scrape Reddit
-#             results = main(product_name)
+            # Step 2: scrape Reddit
+            results = main(product_name)
             
-#             # Step 3: push results back to Firebase
-#             result_ref = db.reference(f'results/{event.path.split("/")[-1]}')  # use same key
-#             result_ref.set(results)
-#             print(f"Sent results back to Firebase.")
+            # Step 3: push results back to Firebase
+            product_ref = db.reference(f'products/{event.path}')  # use same key
+            print(results)
+            product_ref.update({
+            'results': results
+})
+            print(f"Sent results back to Firebase.")
 
-# # Attach listener
-# products_ref = db.reference('products')
-# products_ref.listen(handle_new_product)
+# Attach listener
+products_ref = db.reference('products')
+products_ref.listen(handle_new_product)
 
 # --- MAIN ---
-def main():
+def main(product_name):
     YOUTUBE_API_KEY = os.getenv('GOOGLE_KEY')
-
+    # product_name = input('Product Name:')
     videos = search_youtube(product_name)
     negatives = []
 
@@ -320,5 +332,5 @@ def main():
     print('scraping reddit')
     return reddit_scrap_with_negatives(product_name, negatives, nickname_variants=generate_nicknames(product_name))
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

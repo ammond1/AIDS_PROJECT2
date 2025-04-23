@@ -55,13 +55,23 @@
       background-color: #45a049;
     }
 
-    #chart-container {
+    .chart-container {
       margin-top: 2rem;
       width: 100%;
+      display: none;
     }
 
     canvas {
       max-width: 100%;
+    }
+
+    .export-button {
+      margin-top: 1rem;
+      background-color: #007BFF;
+    }
+
+    .export-button:hover {
+      background-color: #0056b3;
     }
   </style>
 </head>
@@ -72,10 +82,6 @@
 
     <input type="text" id="productInput" placeholder="Enter a product name...">
     <button onclick="submitProduct()">Submit</button>
-
-    <div id="chart-container" style="display:none;">
-      <canvas id="resultChart"></canvas>
-    </div>
   </div>
 
   <!-- Firebase SDKs -->
@@ -87,50 +93,63 @@
 
   <script>
     // Your Firebase configuration
-  const firebaseConfig = {
-  apiKey: "AIzaSyA7QvewqGJHiFWobWrviFEv23RUNis6MY8",
-  authDomain: "aids-project-2-25dcd.firebaseapp.com",
-  databaseURL: "https://aids-project-2-25dcd-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "aids-project-2-25dcd",
-  storageBucket: "aids-project-2-25dcd.firebasestorage.app",
-  messagingSenderId: "99933426831",
-  appId: "1:99933426831:web:ba203f45c4972610d7ccfa",
-  measurementId: "G-PT5NY3FSJV"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyA7QvewqGJHiFWobWrviFEv23RUNis6MY8",
+      authDomain: "aids-project-2-25dcd.firebaseapp.com",
+      databaseURL: "https://aids-project-2-25dcd-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "aids-project-2-25dcd",
+      storageBucket: "aids-project-2-25dcd.firebasestorage.app",
+      messagingSenderId: "99933426831",
+      appId: "1:99933426831:web:ba203f45c4972610d7ccfa",
+      measurementId: "G-PT5NY3FSJV"
+    };
 
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-  function submitProduct() {
-    const productName = document.getElementById('productInput').value.trim();
-    if (!productName) {
-      alert('Please enter a product name!');
-      return;
+    function submitProduct() {
+      const productName = document.getElementById('productInput').value.trim();
+      if (!productName) {
+        alert('Please enter a product name!');
+        return;
+      }
+
+      const newRef = database.ref('products').push();
+      newRef.set({
+        productName: productName,
+        timestamp: Date.now()
+      });
+
+      alert('✅ Product submitted for analysis! It might take a few seconds...');
+
+      // Clear existing chart containers before showing the new one
+      clearExistingCharts();
+
+      // Listen for the backend results
+      newRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.results) {
+          showGraph(data.results, productName);
+        }
+      });
     }
 
-    const newRef = database.ref('products').push();
-    newRef.set({
-      productName: productName,
-      timestamp: Date.now()
-    });
+    function showGraph(results, productName) {
+      // Create a new chart container for the product
+      const chartContainer = document.createElement('div');
+      chartContainer.classList.add('chart-container');
+      document.body.appendChild(chartContainer);
 
-    alert('✅ Product submitted for analysis! It might take a few seconds...');
+      const chartTitle = document.createElement('h2');
+      chartTitle.textContent = `Sentiment Analysis for ${productName}`;
+      chartContainer.appendChild(chartTitle);
 
-    // Listen for the backend results
-    newRef.on('value', (snapshot) => {
-      const data = snapshot.val();
-      if (data && data.results) {
-        showGraph(data.results);
-      }
-    });
-  }
+      const canvas = document.createElement('canvas');
+      chartContainer.appendChild(canvas);
 
-    function showGraph(results) {
-      document.getElementById('chart-container').style.display = 'block';
-
-      const ctx = document.getElementById('resultChart').getContext('2d');
-      new Chart(ctx, {
+      const ctx = canvas.getContext('2d');
+      const chart = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: Object.keys(results),
@@ -150,6 +169,30 @@
           }
         }
       });
+
+      // Add Export button
+      const exportButton = document.createElement('button');
+      exportButton.textContent = 'Export Graph as PNG';
+      exportButton.classList.add('export-button');
+      chartContainer.appendChild(exportButton);
+
+      // Export functionality
+      exportButton.addEventListener('click', function() {
+        const imgURL = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = imgURL;
+        a.download = `${productName}_sentiment_analysis.png`;
+        a.click();
+      });
+
+      // Show the chart container
+      chartContainer.style.display = 'block';
+    }
+
+    function clearExistingCharts() {
+      // Select all chart containers and remove them
+      const chartContainers = document.querySelectorAll('.chart-container');
+      chartContainers.forEach(container => container.remove());
     }
   </script>
 
