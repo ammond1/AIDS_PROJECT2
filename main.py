@@ -208,7 +208,7 @@ def get_all_video_comments(video_id, api_key, max_comments=500):
     return comments[:max_comments]
 
 # --- Sentiment Analysis ---
-NEGATIVE_PATTERNS = [
+NEGATIVE_WORDS = [
     "bad", "terrible", "horrible", "worst", "hate", "broken", "disappointed",
     "disappointing", "sucks", "awful", "problem", "issues", "trash", "scam", "ripoff", "annoying",
     "poor", "frustrating", "not good", "didn't work", "doesn't work", "hard to use",
